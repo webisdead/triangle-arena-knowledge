@@ -1,0 +1,55 @@
+name: Collect metrics and publish knowledge base
+on:
+  schedule:
+    - cron: '7,22,37,52 * * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+concurrency:
+  group: triangle-knowledge-pages
+  cancel-in-progress: false
+jobs:
+  collect-and-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      collection: ${{ steps.collect.outcome }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Validate collector
+        run: python3 -m unittest discover -s tests -v
+      - name: Collect public evidence
+        id: collect
+        continue-on-error: true
+        run: python3 scripts/collect.py
+      - name: Persist observations in Git
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data
+          if ! git diff --cached --quiet; then
+            git commit -m 'Archive public Triangle Arena observations'
+            git push origin HEAD:main
+          fi
+      - name: Build static site
+        run: python3 scripts/build.py
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+  deploy:
+    needs: collect-and-build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/deploy-pages@v4
+        id: deployment
+      - name: Report collection failure after publishing last good data
+        if: needs.collect-and-build.outputs.collection == 'failure'
+        run: exit 1
