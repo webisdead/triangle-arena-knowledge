@@ -18,14 +18,25 @@ jobs:
     timeout-minutes: 10
     outputs:
       collection: ${{ steps.collect.outcome }}
+      metrics: ${{ steps.metrics.outcome }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Validate collector
-        run: python3 -m unittest discover -s tests -v
+        run: |
+          python3 -m unittest discover -s tests -v
+          node --test tests/*.test.cjs
       - name: Collect public evidence
         id: collect
         continue-on-error: true
-        run: python3 scripts/collect.py
+        run: |
+          for sample in 1 2 3; do
+            python3 scripts/collect.py
+            if [ "$sample" != 3 ]; then sleep 20; fi
+          done
+      - name: Verify replays and calculate evidence metrics
+        id: metrics
+        continue-on-error: true
+        run: node scripts/analyze-replays.cjs
       - name: Persist observations in Git
         run: |
           git config user.name 'github-actions[bot]'
@@ -52,6 +63,6 @@ jobs:
     steps:
       - uses: actions/deploy-pages@v4
         id: deployment
-      - name: Report collection failure after publishing last good data
-        if: needs.collect-and-build.outputs.collection == 'failure'
+      - name: Report collection or metric validation failure after publishing valid data
+        if: needs.collect-and-build.outputs.collection == 'failure' || needs.collect-and-build.outputs.metrics == 'failure'
         run: exit 1

@@ -9,6 +9,8 @@ tasks, LLM calls, backend account or external JavaScript dependencies.
 - Available public strategy summaries/taglines, content hashes and first/last observed timestamps.
 - Available public replay seeds, recorded moves and published scores/rankings.
 - Source URL, capture health and GitHub run provenance.
+- Verified per-tick replay metrics: score, income, connection penalties, hotspot
+  control, movement outcomes, enclosures and immediate power-up effects.
 
 The feed rotates its visible matches and descriptions. Missing descriptions stay
 missing. Match samples are not representative. No bot source code is claimed.
@@ -24,7 +26,8 @@ Enable Actions if required by repository policy. Manually run
 **Collect metrics and publish knowledge base** once under **Actions**.
 
 The same workflow collects, commits data and deploys Pages every 15 minutes
-(UTC minutes 7, 22, 37 and 52). No repository secrets are required. GITHUB_TOKEN
+(UTC minutes 7, 22, 37 and 52), taking three feed samples 20 seconds apart to
+improve coverage of the rotating public selection. No repository secrets are required. GITHUB_TOKEN
 uses standard short-lived Actions permissions: contents write, Pages write, OIDC.
 An archive commit made by GITHUB_TOKEN does not recursively trigger a new run.
 GitHub can delay scheduled jobs and may disable schedules in inactive public
@@ -39,7 +42,9 @@ with no usable data fails the build rather than publishing an invented ranking.
 
 ```sh
 python3 -m unittest discover -s tests -v
+node --test tests/*.test.cjs
 python3 scripts/collect.py
+node scripts/analyze-replays.cjs
 python3 scripts/build.py
 ```
 
@@ -54,6 +59,20 @@ observations for that day. `data/snapshots/YYYY-MM-DD/<timestamp>.json`: immutab
 individual observations. `data/strategies.json`: bot map with text versions.
 `data/replays.json`: index whose hashed keys point to `data/replays/<hash>.json`.
 `data/status.json`: most recent collection outcome, collection time and run URL.
+
+`data/metrics/index.json`: verified/rejected replay coverage, errors, per-bot sample
+sizes and averages. `data/metrics/matches/<replay-key>.json`: every tick and pickup,
+seed, starting corner, opponent IDs, published-score verification and SHA-256
+fingerprints. `data/metrics/appearances.csv`: one row per verified bot appearance.
+Full definitions and limits: `site/metrics.html` (published as `metrics.html`).
+
+The analyzer uses the archived public spectator engine with read-only telemetry.
+Only matches reproducing all scores within 1e-8 and the full published ranking
+enter aggregates. Truncated move streams are rejected. Cached reports are
+invalidated on analyzer, engine or input changes. Bot versions, planned projects,
+causal pickup payoff and detour costs remain unknown. Stranded penalty is an
+accounting comparison to fully connected current ownership, not a repair forecast.
+Metrics are observational, not a representative or controlled strategy trial.
 
 Historical snapshots and strategy observations imported from earlier research
 retain their original observation timestamps; imports are not new measurements.
